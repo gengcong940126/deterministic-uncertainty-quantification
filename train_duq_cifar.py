@@ -5,6 +5,7 @@ import random
 
 import torch
 import torch.nn.functional as F
+import os
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
 
@@ -167,18 +168,18 @@ def main(
     metric = Loss(calc_gradient_penalty, output_transform=output_transform_gp)
     metric.attach(evaluator, "gradient_penalty")
 
-    kwargs = {"num_workers": 4, "pin_memory": True}
+    kwargs = {"num_workers": 0, "pin_memory": True}
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, **kwargs
     )
 
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=1000, shuffle=False, **kwargs
+        val_dataset, batch_size=100, shuffle=False, **kwargs
     )
 
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=1000, shuffle=False, **kwargs
+        test_dataset, batch_size=100, shuffle=False, **kwargs
     )
 
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -235,17 +236,20 @@ def main(
     pbar = ProgressBar(dynamic_ncols=True)
     pbar.attach(trainer)
 
-    trainer.run(train_loader, max_epochs=epochs)
+    #trainer.run(train_loader, max_epochs=epochs)
 
     evaluator.run(test_loader)
     acc = evaluator.state.metrics["accuracy"]
-
+    confidence=evaluator.state.output[0].max(1)[0].detach().cpu().numpy()
     print(f"Test - Accuracy {acc:.4f}")
-
+    print(f"Test - confidence_max {confidence.max():.4f}")
+    print(f"Test - confidence_min {confidence.min():.4f}")
     writer.close()
 
 
 if __name__ == "__main__":
+    if 'CUDA_VISIBLE_DEVICES' not in os.environ:
+      os.environ['CUDA_VISIBLE_DEVICES'] = '3,4'
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
